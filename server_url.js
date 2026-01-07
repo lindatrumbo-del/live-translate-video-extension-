@@ -1,1 +1,1 @@
-export const SERVER_URL = 'https://filamentous-gisele-nonvalorous.ngrok-free.dev';
+export const SERVER_URL = 'https://penelkaex.onrender.com';
