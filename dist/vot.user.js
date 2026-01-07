@@ -245,7 +245,7 @@
 // @connect        speed.cloudflare.com
 // @connect        porntn.com
 // @connect        googlevideo.com
-// @connect        filamentous-gisele-nonvalorous.ngrok-free.dev
+// @connect        penelkaex.onrender.com
 // @namespace      vot
 // @version        1.10.7
 // @icon           https://translate.yandex.ru/icons/favicon.ico
@@ -7316,7 +7316,7 @@
 		"./server_url.js": (d, f, p) => {
 			"use strict";
 			p.d(f, { U: () => m });
-			let m = "https://filamentous-gisele-nonvalorous.ngrok-free.dev";
+			let m = "https://penelkaex.onrender.com";
 		},
 		"./src/audioDownloader/iframe.ts": (d, f, p) => {
 			"use strict";
