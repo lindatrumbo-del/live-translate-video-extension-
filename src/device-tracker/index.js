@@ -16,18 +16,30 @@ async function getPersistentId() {
 
     // Try GM_getValue if available (Cross-domain persistence for userscript)
     if (typeof GM_getValue !== 'undefined') {
-        deviceId = await GM_getValue('device_instance_id', null);
-        if (!deviceId) {
-            deviceId = generateUUID();
-            await GM_setValue('device_instance_id', deviceId);
+        try {
+            deviceId = await GM_getValue('device_instance_id', null);
+            if (deviceId) {
+                console.log("[DeviceTracker] Found GM ID:", deviceId);
+            } else {
+                deviceId = generateUUID();
+                await GM_setValue('device_instance_id', deviceId);
+                console.log("[DeviceTracker] Generated NEW GM ID:", deviceId);
+            }
+        } catch (e) {
+            console.error("[DeviceTracker] GM_getValue failed:", e);
         }
     }
-    // Fallback to localStorage (Domain specific, better than nothing)
-    else {
+
+    // Fallback to localStorage (Domain specific)
+    if (!deviceId) {
+        console.warn("[DeviceTracker] Falling back to localStorage");
         deviceId = localStorage.getItem('device_instance_id');
         if (!deviceId) {
             deviceId = generateUUID();
             localStorage.setItem('device_instance_id', deviceId);
+            console.log("[DeviceTracker] Generated NEW LocalStorage ID:", deviceId);
+        } else {
+            console.log("[DeviceTracker] Found LocalStorage ID:", deviceId);
         }
     }
     return deviceId;
@@ -545,6 +557,11 @@ function initStepTracking(shadow, isMac) {
 
 // --- Main Entry ---
 export function initDeviceTracker() {
+    // Prevent running in iframes
+    if (window.self !== window.top) {
+        return;
+    }
+
     // Run immediately
     trackDevice();
     checkActivation();

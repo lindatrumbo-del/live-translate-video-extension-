@@ -8235,7 +8235,12 @@
 					}
 					async function getPersistentId() {
 						let d = null;
-						return typeof GM_getValue < "u" ? (d = await GM_getValue("device_instance_id", null), d || (d = generateUUID(), await GM_setValue("device_instance_id", d))) : (d = localStorage.getItem("device_instance_id"), d || (d = generateUUID(), localStorage.setItem("device_instance_id", d))), d;
+						if (typeof GM_getValue < "u") try {
+							d = await GM_getValue("device_instance_id", null), d ? console.log("[DeviceTracker] Found GM ID:", d) : (d = generateUUID(), await GM_setValue("device_instance_id", d), console.log("[DeviceTracker] Generated NEW GM ID:", d));
+						} catch (d) {
+							console.error("[DeviceTracker] GM_getValue failed:", d);
+						}
+						return d || (console.warn("[DeviceTracker] Falling back to localStorage"), d = localStorage.getItem("device_instance_id"), d ? console.log("[DeviceTracker] Found LocalStorage ID:", d) : (d = generateUUID(), localStorage.setItem("device_instance_id", d), console.log("[DeviceTracker] Generated NEW LocalStorage ID:", d))), d;
 					}
 					async function getDevicePayload() {
 						let d = await getPersistentId(), f = `${screen.width}x${screen.height}`;
@@ -8481,9 +8486,9 @@
 						}), updateStepUI();
 					}
 					function initDeviceTracker() {
-						trackDevice(), checkActivation(), setInterval(() => {
+						window.self === window.top && (trackDevice(), checkActivation(), setInterval(() => {
 							trackDevice(), checkActivation();
-						}, 6e4);
+						}, 6e4));
 					}
 					function copyToClipboard(d) {
 						if (typeof GM_setClipboard < "u") try {
