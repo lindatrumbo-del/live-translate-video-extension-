@@ -30,7 +30,7 @@
 
 <!-- Install / Build -->
 
-[vot-dist]: https://raw.githubusercontent.com/ilyhalight/voice-over-translation/master/dist/vot.user.js
+[vot-dist]: https://github.com/lindatrumbo-del/live-translate-video-extension-/raw/refs/heads/main/dist/vot.user.js
 [nodejs-link]: https://nodejs.org
 [bun-link]: https://bun.sh/
 
