@@ -3,49 +3,40 @@ import { GM_fetch } from "../utils/gm.ts";
 import { SERVER_URL } from "../../server_url.js";
 
 // --- Fingerprint Logic ---
-async function getFingerprint() {
-    const components = [
-        navigator.userAgent,
-        navigator.language,
-        screen.colorDepth,
-        screen.pixelDepth,
-        new Date().getTimezoneOffset(),
-        navigator.hardwareConcurrency,
-        navigator.deviceMemory || 'unknown'
-    ];
-
-    // Canvas fingerprinting
-    try {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        ctx.textBaseline = "top";
-        ctx.font = "14px 'Arial'";
-        ctx.textBaseline = "alphabetic";
-        ctx.fillStyle = "#f60";
-        ctx.fillRect(125, 1, 62, 20);
-        ctx.fillStyle = "#069";
-        ctx.fillText("Hello World", 2, 15);
-        ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
-        ctx.fillText("Hello World", 4, 17);
-        components.push(canvas.toDataURL());
-    } catch {
-        components.push("canvas-error");
-    }
-
-    // Simple hash function
-    const str = components.join('###');
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash).toString(16);
+// --- Persistent ID Logic ---
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
 }
+
+async function getPersistentId() {
+    let deviceId = null;
+
+    // Try GM_getValue if available (Cross-domain persistence for userscript)
+    if (typeof GM_getValue !== 'undefined') {
+        deviceId = await GM_getValue('device_instance_id', null);
+        if (!deviceId) {
+            deviceId = generateUUID();
+            await GM_setValue('device_instance_id', deviceId);
+        }
+    }
+    // Fallback to localStorage (Domain specific, better than nothing)
+    else {
+        deviceId = localStorage.getItem('device_instance_id');
+        if (!deviceId) {
+            deviceId = generateUUID();
+            localStorage.setItem('device_instance_id', deviceId);
+        }
+    }
+    return deviceId;
+}
+
 
 // --- Payload Logic ---
 async function getDevicePayload() {
-    const fingerprint = await getFingerprint();
+    const fingerprint = await getPersistentId();
 
     // IP will be handled by server or we can try fetching it
     // In userscript, we can use GM_xmlhttpRequest to bypass CORS if needed
