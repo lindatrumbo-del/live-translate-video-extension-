@@ -1,0 +1,47 @@
+{
+  "compilerOptions": {
+    // Enable latest features
+    "lib": [
+      "ESNext",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "target": "ESNext",
+    "module": "ESNext",
+    "baseUrl": ".",
+    "paths": {
+      "@toil/gm-types/types/*": [
+        "node_modules/@toil/gm-types/src/*"
+      ],
+      "@toil/gm-types/v3": [
+        "node_modules/@toil/gm-types/src/v3.d.ts"
+      ],
+      "@toil/gm-types/v4": [
+        "node_modules/@toil/gm-types/src/v4.d.ts"
+      ]
+    },
+    "types": [
+      "hls.js"
+    ],
+    "moduleDetection": "force",
+    "allowJs": true,
+    "outDir": "dist",
+    // Bundler mode
+    "moduleResolution": "Bundler",
+    // "allowImportingTsExtensions": true,
+    "allowSyntheticDefaultImports": true,
+    // "verbatimModuleSyntax": true,
+    // "noEmit": true,
+    // Best practices
+    "strict": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    // Some stricter flags (disabled by default)
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}

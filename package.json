@@ -1,0 +1,66 @@
+{
+  "name": "voice-over-translation",
+  "version": "1.0.0",
+  "source": "src/index.js",
+  "author": "Toil",
+  "license": "MIT",
+  "description": "A small extension that adds a Yandex Browser video translation to other browsers",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ilyhalight/voice-over-translation.git"
+  },
+  "keywords": [
+    "cli",
+    "vot",
+    "voice-over-translation"
+  ],
+  "devDependencies": {
+    "@sucrase/webpack-loader": "^2.0.0",
+    "@toil/gm-types": "^1.0.4",
+    "@toil/translate": "^1.0.8",
+    "@types/bun": "^1.2.17",
+    "@vot.js/core": "^2.4.12",
+    "browser-id3-writer": "^6.2.0",
+    "browserslist": "^4.25.0",
+    "eslint": "^9.29.0",
+    "eslint-webpack-plugin": "^5.0.2",
+    "globals": "^16.2.0",
+    "hls.js": "1.5.18",
+    "lefthook": "^1.11.14",
+    "lightningcss": "^1.30.1",
+    "npm-run-all2": "^8.0.4",
+    "oxc-minify-webpack-plugin": "^1.0.0",
+    "oxlint": "^1.3.0",
+    "patch-package": "^8.0.0",
+    "postinstall-postinstall": "^2.1.0",
+    "sass": "^1.89.2",
+    "typescript": "^5.8.3",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.2",
+    "webpack-monkey": "^0.2.1"
+  },
+  "scripts": {
+    "test:ui": "webpack build -c .webpack/test-ui.config.js",
+    "build": "webpack build -c .webpack/webpack.config.js",
+    "build:min": "webpack build -c .webpack/webpack.config.js --env build_type=minify",
+    "build:all": "npx run-p build build:min",
+    "build:bun": "bun run build:all",
+    "build:dev": "webpack build -c .webpack/webpack.config.js --node-env development",
+    "dev": "webpack serve --node-env development",
+    "lint": "npx oxlint && npx eslint",
+    "format": "npx @biomejs/biome check --write ./src",
+    "gen:wiki": "bun run ./scripts/wiki-gen/index.js",
+    "localize": "npx \"@toil/localize-tui\"",
+    "postinstall": "patch-package"
+  },
+  "dependencies": {
+    "@vot.js/ext": "^2.4.12",
+    "@vot.js/shared": "^2.4.12",
+    "bowser": "^2.11.0",
+    "chaimu": "^1.0.6",
+    "lit": "^3.3.0",
+    "requestidlecallback-polyfill": "^1.0.2"
+  }
+}

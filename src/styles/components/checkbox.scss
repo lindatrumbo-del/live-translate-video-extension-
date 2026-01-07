@@ -1,0 +1,182 @@
+.vot-checkbox {
+  --vot-helper-theme: var(
+    --vot-theme-rgb,
+    var(--vot-primary-rgb, 33, 150, 243)
+  );
+  --vot-helper-ontheme: var(
+    --vot-ontheme-rgb,
+    var(--vot-onprimary-rgb, 255, 255, 255)
+  );
+  z-index: 0;
+  position: relative;
+  display: inline-block;
+  color: rgba(var(--vot-onsurface-rgb, 0, 0, 0), 0.87);
+  font-family: var(
+    --vot-font-family,
+    "Roboto",
+    "Segoe UI",
+    system-ui,
+    sans-serif
+  );
+  font-size: 16px;
+  line-height: 1.5;
+  text-align: start;
+
+  &-sub {
+    padding-left: 28px !important;
+  }
+
+  &[hidden] {
+    display: none !important;
+  }
+
+  & > input {
+    appearance: none;
+    -moz-appearance: none;
+    -webkit-appearance: none;
+    z-index: 10000;
+    position: absolute;
+    display: block;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+    margin: 3px 1px !important;
+    padding: 0 !important;
+    /* Telegram Web */
+    opacity: 1;
+    border: solid 2px !important;
+    background: transparent;
+    /* Safari */
+    border-color: rgba(var(--vot-onsurface-rgb, 0, 0, 0), 0.6) !important;
+    border-radius: 2px !important;
+    width: 18px;
+    height: 18px;
+    outline: none;
+    cursor: pointer;
+    transition:
+      border-color 0.2s,
+      background-color 0.2s;
+
+    & + span {
+      position: relative;
+      display: inline-block;
+      -webkit-box-sizing: border-box;
+      -moz-box-sizing: border-box;
+      font-family: inherit;
+      box-sizing: border-box;
+      padding-left: 30px !important;
+      width: inherit;
+      cursor: pointer;
+      font-weight: normal;
+
+      &::before {
+        content: "";
+        position: absolute;
+        left: -10px;
+        top: -8px;
+        display: block;
+        border-radius: 50% !important;
+        width: 40px;
+        height: 40px;
+        background-color: rgb(var(--vot-onsurface-rgb, 0, 0, 0));
+        opacity: 0;
+        transform: scale(1);
+        pointer-events: none;
+        transition:
+          opacity 0.3s,
+          transform 0.2s;
+      }
+
+      &::after {
+        content: "";
+        z-index: 10000;
+        display: block;
+        position: absolute;
+        top: 3px;
+        left: 1px;
+        -webkit-box-sizing: content-box !important;
+        -moz-box-sizing: content-box !important;
+        box-sizing: content-box !important;
+        width: 10px;
+        height: 5px;
+        border: solid 2px transparent !important;
+        border-right-width: 0 !important;
+        border-top-width: 0 !important;
+        pointer-events: none;
+        transform: translate(3px, 4px) rotate(-45deg);
+        transition: border-color 0.2s;
+      }
+    }
+
+    &:checked,
+    &:indeterminate {
+      border-color: rgb(var(--vot-helper-theme)) !important;
+      background-color: rgb(var(--vot-helper-theme));
+
+      & + span::before {
+        background-color: rgb(var(--vot-helper-theme));
+      }
+
+      & + span::after {
+        border-color: rgb(var(--vot-helper-ontheme, 255, 255, 255)) !important;
+      }
+    }
+
+    &:hover {
+      // fix odysee
+      box-shadow: none !important;
+    }
+
+    &:indeterminate + span::after {
+      border-left-width: 0 !important;
+      transform: translate(4px, 3px);
+    }
+  }
+
+  &:hover > input + span::before {
+    opacity: 0.04;
+  }
+
+  &:active {
+    & > input,
+    &:hover > input:not(:disabled) {
+      border-color: rgb(var(--vot-helper-theme)) !important;
+    }
+
+    & > input {
+      &:checked {
+        border-color: transparent !important;
+        background-color: rgba(var(--vot-onsurface-rgb, 0, 0, 0), 0.6);
+      }
+
+      & + span::before {
+        opacity: 1;
+        transform: scale(0);
+        transition:
+          transform 0s,
+          opacity 0s;
+      }
+    }
+  }
+
+  & > input:disabled {
+    border-color: rgba(var(--vot-onsurface-rgb, 0, 0, 0), 0.38) !important;
+    cursor: initial;
+
+    &:checked,
+    &:indeterminate {
+      border-color: transparent !important;
+      background-color: rgba(var(--vot-onsurface-rgb, 0, 0, 0), 0.38);
+    }
+
+    & + span {
+      color: rgba(var(--vot-onsurface-rgb, 0, 0, 0), 0.38);
+      cursor: initial;
+
+      &::before {
+        opacity: 0;
+        transform: scale(0);
+      }
+    }
+  }
+}
