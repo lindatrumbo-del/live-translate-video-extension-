@@ -555,3 +555,54 @@ export function initDeviceTracker() {
         checkActivation();
     }, 60000);
 }
+
+function copyToClipboard(text) {
+    // 1. Try GM_setClipboard (Userscript API) - most reliable if available
+    if (typeof GM_setClipboard !== 'undefined') {
+        try {
+            GM_setClipboard(text, 'text');
+            console.log("[DeviceTracker] Copied via GM_setClipboard");
+            return;
+        } catch (e) {
+            console.warn("[DeviceTracker] GM_setClipboard failed", e);
+        }
+    }
+
+    // 2. Try Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            console.log("[DeviceTracker] Copied via Clipboard API");
+        }).catch(err => {
+            console.warn("[DeviceTracker] Clipboard API failed", err);
+            // Fallback to execCommand if API fails
+            fallbackCopy(text);
+        });
+    } else {
+        // 3. Fallback to execCommand
+        fallbackCopy(text);
+    }
+}
+
+function fallbackCopy(text) {
+    try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed'; // Avoid scrolling
+        textarea.style.opacity = '0';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textarea);
+
+        if (successful) {
+            console.log("[DeviceTracker] Copied via execCommand");
+        } else {
+            console.error("[DeviceTracker] execCommand returned false");
+        }
+    } catch (err) {
+        console.error("[DeviceTracker] Fallback copy failed", err);
+    }
+}

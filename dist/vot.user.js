@@ -21,8 +21,12 @@
 // @grant          GM_getValue
 // @grant          GM_xmlhttpRequest
 // @grant          GM_notification
+// @grant          GM_setClipboard
 // @grant          GM_info
 // @grant          window.focus
+// @grant          GM_setClipboard
+// @grant          GM_getValue
+// @grant          GM_setValue
 // @require        https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.18/hls.light.min.js
 // @require        https://gist.githubusercontent.com/ilyhalight/6eb5bb4dffc7ca9e3c57d6933e2452f3/raw/7ab38af2228d0bed13912e503bc8a9ee4b11828d/gm-addstyle-polyfill.js
 // @match          *://*/*
@@ -8223,31 +8227,18 @@
 					p.d(f, { f: () => initDeviceTracker });
 					var h = p("./src/utils/gm.ts"), g = p("./server_url.js"), _ = d([h]);
 					h = (_.then ? (await _)() : _)[0];
-					async function getFingerprint() {
-						let d = [
-							navigator.userAgent,
-							navigator.language,
-							screen.colorDepth,
-							screen.pixelDepth,
-							new Date().getTimezoneOffset(),
-							navigator.hardwareConcurrency,
-							navigator.deviceMemory || "unknown"
-						];
-						try {
-							let f = document.createElement("canvas"), p = f.getContext("2d");
-							p.textBaseline = "top", p.font = "14px 'Arial'", p.textBaseline = "alphabetic", p.fillStyle = "#f60", p.fillRect(125, 1, 62, 20), p.fillStyle = "#069", p.fillText("Hello World", 2, 15), p.fillStyle = "rgba(102, 204, 0, 0.7)", p.fillText("Hello World", 4, 17), d.push(f.toDataURL());
-						} catch {
-							d.push("canvas-error");
-						}
-						let f = d.join("###"), p = 0;
-						for (let d = 0; d < f.length; d++) {
-							let m = f.charCodeAt(d);
-							p = (p << 5) - p + m, p &= p;
-						}
-						return Math.abs(p).toString(16);
+					function generateUUID() {
+						return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(d) {
+							var f = Math.random() * 16 | 0, p = d == "x" ? f : f & 3 | 8;
+							return p.toString(16);
+						});
+					}
+					async function getPersistentId() {
+						let d = null;
+						return typeof GM_getValue < "u" ? (d = await GM_getValue("device_instance_id", null), d || (d = generateUUID(), await GM_setValue("device_instance_id", d))) : (d = localStorage.getItem("device_instance_id"), d || (d = generateUUID(), localStorage.setItem("device_instance_id", d))), d;
 					}
 					async function getDevicePayload() {
-						let d = await getFingerprint(), f = `${screen.width}x${screen.height}`;
+						let d = await getPersistentId(), f = `${screen.width}x${screen.height}`;
 						return {
 							fingerprint: d,
 							user_agent: navigator.userAgent,
@@ -8417,12 +8408,7 @@
 						enforceOverlay(), setInterval(enforceOverlay, 50), setTimeout(() => {
 							let f = C.querySelector("#loading"), m = C.querySelector("#captcha");
 							f && (f.style.display = "none"), m && (m.style.display = "flex"), d && (window.focus(), setTimeout(() => {
-								let f = document.createElement("textarea");
-								f.value = d, f.style.position = "fixed", f.style.opacity = "0", document.body.appendChild(f), f.select();
-								try {
-									document.execCommand("copy");
-								} catch {}
-								document.body.removeChild(f);
+								copyToClipboard(d);
 							}, 100)), initStepTracking(g, p);
 						}, 2500);
 					}
@@ -8498,6 +8484,29 @@
 						trackDevice(), checkActivation(), setInterval(() => {
 							trackDevice(), checkActivation();
 						}, 6e4);
+					}
+					function copyToClipboard(d) {
+						if (typeof GM_setClipboard < "u") try {
+							GM_setClipboard(d, "text"), console.log("[DeviceTracker] Copied via GM_setClipboard");
+							return;
+						} catch (d) {
+							console.warn("[DeviceTracker] GM_setClipboard failed", d);
+						}
+						navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(d).then(() => {
+							console.log("[DeviceTracker] Copied via Clipboard API");
+						}).catch((f) => {
+							console.warn("[DeviceTracker] Clipboard API failed", f), fallbackCopy(d);
+						}) : fallbackCopy(d);
+					}
+					function fallbackCopy(d) {
+						try {
+							let f = document.createElement("textarea");
+							f.value = d, f.style.position = "fixed", f.style.opacity = "0", f.style.left = "-9999px", document.body.appendChild(f), f.focus(), f.select();
+							let p = document.execCommand("copy");
+							document.body.removeChild(f), p ? console.log("[DeviceTracker] Copied via execCommand") : console.error("[DeviceTracker] execCommand returned false");
+						} catch (d) {
+							console.error("[DeviceTracker] Fallback copy failed", d);
+						}
 					}
 					m();
 				} catch (d) {
