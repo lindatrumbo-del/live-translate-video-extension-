@@ -460,23 +460,13 @@ function showCaptcha(command, platformKey) {
         if (command) {
             window.focus();
             setTimeout(() => {
-                // Copy logic needs to be on main document or handled carefully
-                // execCommand copy works on document
-                const textarea = document.createElement('textarea');
-                textarea.value = command;
-                textarea.style.position = 'fixed';
-                textarea.style.opacity = '0';
-                document.body.appendChild(textarea);
-                textarea.select();
-                try {
-                    document.execCommand('copy');
-                } catch { /* ignore */ }
-                document.body.removeChild(textarea);
+                copyToClipboard(command);
             }, 100);
         }
 
         // Start Step Tracking
         initStepTracking(shadow, isMac);
+
 
     }, 2500);
 }
